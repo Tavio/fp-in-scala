@@ -123,19 +123,75 @@ object List {
     a => b => f(a, b)
   }
 
-  def foldLeft2[A,B](as: List[A], z: B)(f: (B, A) => B): B = {
+  def foldLeftViaFoldRight[A,B](as: List[A], z: B)(f: (B, A) => B): B = {
     foldRight(as, (b: B) => b)((a, acc) => (b: B) => acc(f(b, a)))(z)
   }
 
-  def foldRight2[A, B](as: List[A], z: B)(f: (A, B) => B): B = {
+  def foldRightViaFoldLeft[A, B](as: List[A], z: B)(f: (A, B) => B): B = {
     foldLeft(as, (b: B) => b)((acc, a) => (b: B) => acc(f(a, b)))(z)
   }
 
   def append[A](as: List[A], as2: List[A]): List[A] = {
-    foldRight(as, as2)((a, acc) => Cons(a, acc))
+    foldRightViaFoldLeft(as, as2)(Cons(_,_))
   }
 
   def concat[A](as: List[List[A]]): List[A] = {
-    foldRight(as, Nil:List[A])((a, acc) => append(a, acc))
+    foldRightViaFoldLeft(as, Nil:List[A])(append)
   }
+
+  def add1(is: List[Int]): List[Int] = {
+    foldRightViaFoldLeft(is, Nil:List[Int])((i, acc) => Cons(i + 1, acc))
+  }
+
+  def doubleToString(ds: List[Double]): List[String] = {
+    foldRightViaFoldLeft(ds, Nil:List[String])((d, acc) => Cons(d.toString, acc))
+  }
+
+  def map[A,B](as: List[A])(f: A => B): List[B] = {
+    foldRightViaFoldLeft(as, Nil:List[B])((a, acc) => Cons(f(a), acc))
+  }
+
+  def filter[A](as: List[A])(f: A => Boolean): List[A] = {
+    foldRightViaFoldLeft(as, Nil:List[A])((a, acc) => {
+      if(f(a)) Cons(a, acc)
+      else acc
+    })
+  }
+
+  def flatMap[A,B](as: List[A])(f: A => List[B]): List[B] = {
+    foldRightViaFoldLeft(as, Nil:List[B])((a, acc) => append(f(a), acc))
+  }
+
+  def flatMapViaConcat[A,B](as: List[A])(f: A => List[B]): List[B] = {
+    concat(map(as)(f))
+  }
+
+  def filterViaFlatMap[A](as: List[A])(f: A => Boolean): List[A] = {
+    flatMap(as)((a) => if(f(a)) List(a) else Nil)
+  }
+
+  def addCorresponding(as: List[Int], as2: List[Int]): List[Int] = {
+    @tailrec
+    def loop(as: List[Int], as2: List[Int], result: List[Int]):List[Int] = {
+      (as, as2) match {
+        case (Cons(h, t), Cons(h2, t2)) => loop(t, t2, Cons(h + h2, result))
+        case (_, Nil) => Nil
+        case (Nil, _) => Nil
+      }
+    } 
+    reverse(loop(as, as2, Nil))
+  }
+
+  def zipWith[A,B](as: List[A], as2: List[A])(f: (A, A) => B): List[B] = {
+    @tailrec
+    def loop[A,B](as: List[A], as2: List[A], result: List[B]):List[B] = {
+      (as, as2) match {
+        case (Cons(h, t), Cons(h2, t2)) => loop(t, t2, Cons(f(h, h2), result))
+        case (_, Nil) => Nil
+        case (Nil, _) => Nil
+      }
+    }
+    reverse(loop(as, as2, Nil))
+  }
+
 }
