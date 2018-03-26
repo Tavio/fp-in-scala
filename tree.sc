@@ -46,15 +46,6 @@ object Tree {
     case Leaf(value) => Leaf(f(value))
     case Branch(left, right) => Branch(map(left)(f), map(right)(f))
   }
-
-  def mapTailRec[A,B](t: Tree[A])(f: A => B):Tree[B] = {
-    def loop(t: Tree[A], m: Tree[B])(f: A => B): Tree[B] = {
-
-    }
-
-
-
-  }
 }
 
 
