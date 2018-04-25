@@ -1,3 +1,5 @@
+import scala.collection.mutable.ListBuffer
+
 case class State[S,+A](run: S => (A,S)) {
   def unit[A](a: A): State[S, A] =
     State(s => (a, s))
@@ -103,3 +105,18 @@ val nsForComprehension = for {
 } yield xs.map(_ % y)
 
 nsForComprehension.run(rng)._1
+
+val l = ListBuffer(1,2,3,4)
+
+val s = State((l:ListBuffer[Int]) => {
+  l.append(1)
+  (1, l)
+})
+
+
+
+
+
+s.run(l)
+
+l

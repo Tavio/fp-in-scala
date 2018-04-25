@@ -1,9 +1,7 @@
 case class State[S,+A](run: S => (A,S)) {
-  def unit[A](a: A): State[S, A] =
-    State(s => (a, s))
 
   def map[B](f: A => B): State[S, B] = {
-    flatMap(a => unit(f(a)))
+    flatMap(a => State.unit(f(a)))
   }
 
   def map2[B,C](sb: State[S, B])(f: (A, B) => C): State[S, C] = {
@@ -16,10 +14,19 @@ case class State[S,+A](run: S => (A,S)) {
       f(a).run(nextState)
     })
   }
+}
+
+object State {
+  def unit[S, A](a: A): State[S, A] =
+    State(s => (a, s))
+
+  def sequence[S, A](sas: List[State[S, A]]): State[S, List[A]] = {
+    sas.foldRight(unit[S, List[A]](List()))((f, acc) => f.map2(acc)(_ :: _))
+  }
 
   def modify[S](f: S => S): State[S, Unit] = for {
-    s <- get
-    _ <- set(f(s))
+    s <- get // Gets the current state and assigns it to `s`.
+    _ <- set(f(s)) // Sets the new state to `f` applied to `s`.
   } yield ()
 
   def get[S]: State[S, S] = State(s => (s, s))
@@ -49,13 +56,46 @@ object Candy {
   }
 
   def simulateMachine(inputs: List[Input]): State[Machine, (Int, Int)] = {
-    val initialState: State[Machine, (Int, Int)] = State(m => ((m.candies, m.coins), m))
-    inputs.foldLeft(initialState) {
-      case (s, Coin) => s.flatMap(insertCoin)
-      case (s, Turn) => s.flatMap(turnKnob)
-    }
+    State((m: Machine) => {
+      inputs.foldLeft(State.unit((m.candies, m.coins)): State[Machine, (Int, Int)]) {
+        case (s, Coin) => s.flatMap(insertCoin)
+        case (s, Turn) => s.flatMap(turnKnob)
+      }.run(m)
+    })
   }
+
+  def simulateMachineBookAnswer(inputs: List[Input]): State[Machine, (Int, Int)] = for {
+    _ <- State.sequence(inputs.map(i => State.modify((s: Machine) => (i, s) match {
+      case (_, Machine(_, 0, _)) => s
+      case (Coin, Machine(false, _, _)) => s
+      case (Turn, Machine(true, _, _)) => s
+      case (Coin, Machine(true, candy, coin)) =>
+        Machine(false, candy, coin + 1)
+      case (Turn, Machine(false, candy, coin)) =>
+        Machine(true, candy - 1, coin)
+    })))
+    s <- State.get
+  } yield (s.coins, s.candies)
 }
 
 val m = Machine(true, 10, 0)
 Candy.simulateMachine(List(Coin, Turn, Turn, Coin, Coin, Coin, Turn)).run(m)
+Candy.simulateMachineBookAnswer(List(Coin, Turn, Turn, Coin, Coin, Coin, Turn)).run(m)
+
+val inputs = List(Coin, Turn)
+
+val seq = State.sequence(inputs.map(i => State.modify((s: Machine) => (i, s) match {
+  case (_, Machine(_, 0, _)) => s
+  case (Coin, Machine(false, _, _)) => s
+  case (Turn, Machine(true, _, _)) => s
+  case (Coin, Machine(true, candy, coin)) =>
+    Machine(false, candy, coin + 1)
+  case (Turn, Machine(false, candy, coin)) =>
+    Machine(true, candy - 1, coin)
+})))
+
+seq.flatMap(_ => {
+  State.get.map(s => {
+    (s.coins, s.candies)
+  })
+})

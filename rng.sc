@@ -71,6 +71,11 @@ def map[A,B](s: Rand[A])(f: A => B): Rand[B] =
     (f(a), rng2)
   }
 
+def nonNegativeInt2(rng: RNG): (Int, RNG) = {
+  val (n, nextRNG) = rng.nextInt
+  (if (n < 0) -(n + 1) else n, nextRNG)
+}
+
 def nonNegativeEven: Rand[Int] =
   map(nonNegativeInt)(i => i - i % 2)
 
@@ -131,7 +136,7 @@ def map2ViaFlatMap[A,B,C](ra: Rand[A], rb: Rand[B])(f: (A, B) => C): Rand[C] = {
   flatMap(ra)(a => map(rb)(b => f(a,b)))
 }
 
-val rng = SimpleRNG(42)
+val rng = SimpleRNG(19876)
 doubleViaMap(rng)
 both(nonNegativeEven, doubleViaMap)(rng)
 intsViaSequence(5)(rng)

@@ -40,6 +40,23 @@ def compose[A,B,C](f: B => C, g: A => B): A => C = {
   a => f(g(a))
 }
 
+trait Monoid[A] {
+  def op(a1: A, a2: A): A
+  def zero: A
+}
+
+def endoMonoid[A] = new Monoid[A => A] {
+  def zero = (a: A) => a
+  def op(f1: A => A, f2: A => A) = {
+    f1.andThen(f2)
+  }
+}
+
+def dual[A](m: Monoid[A]): Monoid[A] = new Monoid[A] {
+  def op(x: A, y: A): A = m.op(y, x)
+  val zero = m.zero
+}
+
 sealed trait List[+A]
 case object Nil extends List[Nothing]
 case class Cons[+A](head: A, tail: List[A]) extends List[A]
@@ -131,6 +148,18 @@ object List {
     foldLeft(as, (b: B) => b)((acc, a) => (b: B) => acc(f(a, b)))(z)
   }
 
+  def foldMap[A,B](as: List[A], m: Monoid[B])(f: A => B): B = {
+    foldLeft(as, m.zero)((acc, a) => m.op(acc, f(a)))
+  }
+
+  def foldRightViaFoldMap[A, B](as: List[A], z: B)(f: (A, B) => B): B = {
+    foldMap(as, endoMonoid[B])(f.curried)(z)
+  }
+
+  def foldLeftViaFoldMap[A,B](as: List[A], z: B)(f: (B, A) => B): B = {
+    foldMap(as, dual(endoMonoid[B]))(a => b => f(b, a))(z)
+  }
+
   def append[A](as: List[A], as2: List[A]): List[A] = {
     foldRightViaFoldLeft(as, as2)(Cons(_,_))
   }
@@ -182,15 +211,21 @@ object List {
     reverse(loop(as, as2, Nil))
   }
 
-  def zipWith[A,B](as: List[A], as2: List[A])(f: (A, A) => B): List[B] = {
-    @tailrec
-    def loop[A,B](as: List[A], as2: List[A], result: List[B]):List[B] = {
-      (as, as2) match {
-        case (Cons(h, t), Cons(h2, t2)) => loop(t, t2, Cons(f(h, h2), result))
-        case (_, Nil) => Nil
-        case (Nil, _) => Nil
-      }
-    }
-    reverse(loop(as, as2, Nil))
-  }
+//  def zipWith[A,B](as: List[A], as2: List[A])(f: (A, A) => B): List[B] = {
+//    @tailrec
+//    def loop[A,B](as: List[A], as2: List[A], result: List[B]):List[B] = {
+//      (as, as2) match {
+//        case (Cons(h, t), Cons(h2, t2)) => loop(t, t2, Cons(f(h, h2), result))
+//        case (_, Nil) => Nil
+//        case (Nil, _) => Nil
+//      }
+//    }
+//    reverse(loop(as, as2, Nil))
+//  }
 }
+
+
+List.foldRightViaFoldMap(List(5,1,1), 10)((i, acc) => acc - i)
+List.foldLeftViaFoldMap(List(5,1,1), 10)((i, acc) => i - acc)
+
+List.foldRightViaFoldMap(List[Int](), 10)((i, acc) => acc - i)
